@@ -27,8 +27,9 @@ def normalize_vectors(Ex, Ey):
 
 def plot_field_and_equipotential(voltage_data, num_field_lines=20, num_equipotential=15):
     """Create visualization of electric field and equipotential lines"""
-    # Create coordinate meshgrid
-    y, x = np.mgrid[0:voltage_data.shape[0], 0:voltage_data.shape[1]]
+    # Create coordinate meshgrid with y increasing downward
+    rows, cols = voltage_data.shape
+    x, y = np.meshgrid(np.arange(cols), np.arange(rows))
     
     # Calculate electric field
     Ex, Ey = calculate_electric_field(voltage_data)
@@ -68,6 +69,9 @@ def plot_field_and_equipotential(voltage_data, num_field_lines=20, num_equipoten
     plt.ylabel('Y Position')
     plt.colorbar(contourf, label='Electric Potential (V)')
     plt.grid(True, alpha=0.3)
+    
+    # Invert y-axis to make (0,0) at top-left
+    plt.gca().invert_yaxis()
     
     return plt
 
