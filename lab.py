@@ -63,8 +63,13 @@ def plot_field_and_equipotential(voltage_data, num_field_lines=20, num_equipoten
                   arrowstyle='->',
                   minlength=0.3)
     
+    # Move x-axis to top
+    ax = plt.gca()
+    ax.xaxis.set_ticks_position('top')
+    ax.xaxis.set_label_position('top')
+    
     # Customize plot
-    plt.title('Electric Field Lines and Equipotential Lines')
+    plt.title('Electric Field Lines and Equipotential Lines', pad=25)  # Add padding to title
     plt.xlabel('X Position')
     plt.ylabel('Y Position')
     plt.colorbar(contourf, label='Electric Potential (V)')
