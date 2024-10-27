@@ -1,84 +1,94 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy import ndimage
+from scipy.ndimage import gaussian_filter
 import pandas as pd
-from scipy.interpolate import RegularGridInterpolator
 
-def visualize_electric_field(csv_path):
-    """
-    Creates a visualization of electric field lines and equipotential lines
-    from a CSV file containing electric potential values.
-    
-    Args:
-        csv_path (str): Path to the CSV file containing the electric potential data
-    """
-    # Read the CSV file
-    potential_data = pd.read_csv(csv_path, header=None).values
-    
-    # Create coordinate grids for the original data
-    y_orig = np.arange(potential_data.shape[0])
-    x_orig = np.arange(potential_data.shape[1])
-    
-    # Calculate electric field components using gradient
-    grad_y, grad_x = np.gradient(potential_data)
-    Ey, Ex = -grad_y, -grad_x
-    
-    # Calculate field magnitude (proportional to density of field lines)
+def load_voltage_data(file_path):
+    """Load voltage data from CSV file and convert to numpy array"""
+    try:
+        # Read CSV file without headers
+        voltage_data = pd.read_csv(file_path, header=None).values
+        return voltage_data
+    except Exception as e:
+        print(f"Error reading CSV file: {e}")
+        return None
+
+def calculate_electric_field(voltage_data, dx=1, dy=1):
+    """Calculate electric field components using gradient"""
+    Ey, Ex = np.gradient(-voltage_data, dy, dx)  # Negative gradient gives E-field
+    return Ex, Ey
+
+def normalize_vectors(Ex, Ey):
+    """Normalize electric field vectors"""
     E_magnitude = np.sqrt(Ex**2 + Ey**2)
+    Ex_norm = Ex / (E_magnitude + 1e-10)  # Add small number to avoid division by zero
+    Ey_norm = Ey / (E_magnitude + 1e-10)
+    return Ex_norm, Ey_norm
+
+def plot_field_and_equipotential(voltage_data, num_field_lines=20, num_equipotential=15):
+    """Create visualization of electric field and equipotential lines"""
+    # Create coordinate meshgrid
+    y, x = np.mgrid[0:voltage_data.shape[0], 0:voltage_data.shape[1]]
     
-    # Create interpolators for Ex, Ey, and density
-    Ex_interp = RegularGridInterpolator((y_orig, x_orig), Ex, bounds_error=False, fill_value=None)
-    Ey_interp = RegularGridInterpolator((y_orig, x_orig), Ey, bounds_error=False, fill_value=None)
-    density_interp = RegularGridInterpolator((y_orig, x_orig), E_magnitude, bounds_error=False, fill_value=None)
+    # Calculate electric field
+    Ex, Ey = calculate_electric_field(voltage_data)
+    Ex_norm, Ey_norm = normalize_vectors(Ex, Ey)
     
-    # Create the figure and axis
+    # Create figure
     plt.figure(figsize=(12, 10))
     
-    # Plot equipotential lines with increased thickness
-    contours = plt.contour(x_orig, y_orig, potential_data, levels=15, colors='blue', alpha=0.6, linewidths=1.5)
-    plt.clabel(contours, inline=True, fontsize=8, fmt='%.1f V')
+    # Create filled contour plot for the background
+    contourf = plt.contourf(x, y, voltage_data, levels=50, 
+                           cmap='RdYlBu_r', alpha=0.3)
     
-    # Create grid for streamplot
-    nx, ny = 30, 30  # Number of points in each direction
-    x_grid = np.linspace(0, potential_data.shape[1]-1, nx)
-    y_grid = np.linspace(0, potential_data.shape[0]-1, ny)
-    X, Y = np.meshgrid(x_grid, y_grid)
+    # Plot equipotential lines
+    contour = plt.contour(x, y, voltage_data, levels=num_equipotential, 
+                         colors='blue', alpha=0.8)
+    plt.clabel(contour, inline=True, fontsize=8, fmt='%.1f V')
     
-    # Create points for interpolation
-    points = np.array([(y, x) for y in y_grid for x in x_grid]).reshape(ny, nx, 2)
+    # Calculate field strength for density scaling
+    E_magnitude = np.sqrt(Ex**2 + Ey**2)
+    max_magnitude = np.max(E_magnitude)
     
-    # Interpolate vector field onto regular grid
-    Ex_grid = Ex_interp(points).reshape(ny, nx)
-    Ey_grid = Ey_interp(points).reshape(ny, nx)
-    density_grid = density_interp(points).reshape(ny, nx)
+    # Use a scalar density value that varies with field strength
+    density = 1.5  # Base density value
     
-    # Normalize the density grid
-    density_grid = (density_grid - density_grid.min()) / (density_grid.max() - density_grid.min())
-    
-    # Plot electric field lines using streamplot with increased thickness
-    # Increased base linewidth from 1 to 2.5 and adjusted density
-    plt.streamplot(x_grid, y_grid, Ex_grid, Ey_grid,
-                  density=1.5,
-                  linewidth=2.5*density_grid,  # Increased base linewidth
+    # Plot electric field lines using streamplot
+    plt.streamplot(x, y, Ex_norm, Ey_norm, 
+                  density=density,
                   color='red',
-                  arrowsize=1.5,  # Slightly increased arrow size
-                  integration_direction='both')
+                  linewidth=1,
+                  arrowsize=1,
+                  arrowstyle='->',
+                  minlength=0.3)
     
-    # Add colormap of potential with reduced alpha for better line visibility
-    plt.imshow(potential_data, extent=[0, potential_data.shape[1]-1, 
-                                     potential_data.shape[0]-1, 0],
-              cmap='viridis', alpha=0.2)  # Reduced background alpha for better contrast
-    plt.colorbar(label='Electric Potential (V)')
-    
-    # Customize the plot
-    plt.title('Electric Field and Equipotential Lines', fontsize=14)
-    plt.xlabel('X Position', fontsize=12)
-    plt.ylabel('Y Position', fontsize=12)
+    # Customize plot
+    plt.title('Electric Field Lines and Equipotential Lines')
+    plt.xlabel('X Position')
+    plt.ylabel('Y Position')
+    plt.colorbar(contourf, label='Electric Potential (V)')
     plt.grid(True, alpha=0.3)
     
     return plt
 
-# Example usage with your CSV file
-csv_file_path = "labdata.csv"
-plt = visualize_electric_field(csv_file_path)
-plt.show()
+def visualize_electric_field(file_path):
+    """Main function to create visualization from CSV file"""
+    # Load data
+    voltage_data = load_voltage_data(file_path)
+    
+    if voltage_data is None:
+        return
+    
+    # Apply slight smoothing to reduce noise
+    voltage_data = gaussian_filter(voltage_data, sigma=0.5)
+    
+    # Create visualization
+    plt = plot_field_and_equipotential(voltage_data)
+    
+    # Show the plot
+    plt.show()
+
+if __name__ == "__main__":
+    # Example usage
+    file_path = "labdata.csv"  # Replace with your CSV file path
+    visualize_electric_field(file_path)
