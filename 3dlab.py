@@ -129,5 +129,5 @@ def visualize_electric_field_3d(file_path):
 
 if __name__ == "__main__":
     # Example usage
-    file_path = "labdata.csv"  # Replace with your CSV file path
+    file_path = "labdata3.csv"  # Replace with your CSV file path
     visualize_electric_field_3d(file_path)
